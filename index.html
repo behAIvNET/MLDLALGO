@@ -1,0 +1,1201 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ML / DL Algoritma Seçim Matrisi</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;600&family=Syne:wght@400;700;800&display=swap');
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  :root{
+    --bg:#0a0a0f;--surface:#111118;--border:#1e1e2e;--faint:#14141e;
+    --accent1:#7c6af7;--accent2:#f76a8a;--accent3:#6af7c8;--accent4:#f7c26a;
+    --text:#e8e8f0;--muted:#6b6b80;
+    --klasik:#7c6af7;--dl:#f76a8a;--ensemble:#6af7c8;--danger:#f7726a;
+  }
+  body{background:var(--bg);color:var(--text);font-family:'Syne',sans-serif;min-height:100vh;padding:2rem;}
+  h1{font-size:clamp(1.4rem,3vw,2rem);font-weight:800;letter-spacing:-0.02em;margin-bottom:0.3rem;background:linear-gradient(90deg,var(--accent1),var(--accent3));-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+  .subtitle{font-family:'JetBrains Mono',monospace;font-size:0.75rem;color:var(--muted);margin-bottom:2rem;}
+  .filters{display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;margin-bottom:2rem;}
+  .filter-group label{font-family:'JetBrains Mono',monospace;font-size:0.65rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.1em;display:block;margin-bottom:0.5rem;}
+  .filter-group select{width:100%;background:var(--surface);border:1px solid var(--border);color:var(--text);font-family:'JetBrains Mono',monospace;font-size:0.75rem;padding:0.6rem 0.8rem;border-radius:6px;appearance:none;cursor:pointer;transition:border-color 0.2s;}
+  .filter-group select:focus{outline:none;border-color:var(--accent1);}
+  .recommendation{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:1.2rem 1.5rem;margin-bottom:2rem;display:none;animation:fadeIn 0.3s ease;}
+  .recommendation.visible{display:block;}
+  .rec-label{font-family:'JetBrains Mono',monospace;font-size:0.65rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:0.5rem;}
+  .rec-algo{font-size:1.3rem;font-weight:800;margin-bottom:0.4rem;}
+  .rec-why{font-family:'JetBrains Mono',monospace;font-size:0.72rem;color:var(--muted);line-height:1.6;}
+  .matrix-wrap{overflow-x:auto;}
+  table{width:100%;border-collapse:collapse;font-family:'JetBrains Mono',monospace;font-size:0.72rem;}
+  thead tr{border-bottom:1px solid var(--border);}
+  th{padding:0.7rem 0.8rem;text-align:left;color:var(--muted);font-weight:400;font-size:0.65rem;text-transform:uppercase;letter-spacing:0.08em;white-space:nowrap;}
+  td{padding:0.75rem 0.8rem;border-bottom:1px solid var(--faint);vertical-align:middle;}
+  tr{transition:background 0.15s;}
+  tr:hover td{background:#13131d;}
+  tr.highlighted td{background:#16162a;}
+  tr.dimmed td{opacity:0.25;}
+  .algo-name{font-weight:600;font-size:0.78rem;}
+  .tag{display:inline-block;padding:0.2rem 0.5rem;border-radius:4px;font-size:0.62rem;font-weight:600;letter-spacing:0.05em;}
+  .tag-klasik{background:#1a1630;color:var(--klasik);border:1px solid #2d2550;}
+  .tag-dl{background:#1f1020;color:var(--dl);border:1px solid #3a1530;}
+  .tag-ensemble{background:#0e1f1a;color:var(--ensemble);border:1px solid #1a3d30;}
+  .dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:4px;vertical-align:middle;}
+  .dot-good{background:var(--ensemble);}
+  .dot-ok{background:var(--accent4);}
+  .dot-bad{background:var(--danger);}
+  .dot-na{background:var(--muted);}
+  .section-row td{background:#0d0d15;color:var(--accent1);font-size:0.65rem;letter-spacing:0.15em;text-transform:uppercase;padding:0.4rem 0.8rem;border-bottom:1px solid var(--border);}
+  .legend{display:flex;gap:1.5rem;margin-top:1.5rem;flex-wrap:wrap;}
+  .legend-item{display:flex;align-items:center;gap:0.4rem;font-family:'JetBrains Mono',monospace;font-size:0.65rem;color:var(--muted);}
+  @keyframes fadeIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
+  @media(max-width:600px){.filters{grid-template-columns:1fr}body{padding:1rem}}
+</style>
+</head>
+<body>
+
+<h1>ML / DL Algoritma Seçim Matrisi</h1>
+<p class="subtitle">// veri tipi × görev × kısıt → algoritma</p>
+
+<div class="filters">
+  <div class="filter-group">
+    <label>Veri Tipi</label>
+    <select id="f-veri" onchange="filter()">
+      <option value="">— seç —</option>
+      <option value="tablo">Tablo / Yapısal</option>
+      <option value="goruntu">Görüntü / Video</option>
+      <option value="metin">Metin / Dil</option>
+      <option value="zaman">Zaman Serisi</option>
+      <option value="graf">Graf / Ağ</option>
+      <option value="ses">Ses / Sinyal</option>
+    </select>
+  </div>
+  <div class="filter-group">
+    <label>Görev Türü</label>
+    <select id="f-gorev" onchange="filter()">
+      <option value="">— seç —</option>
+      <optgroup label="── Tablo">
+        <option value="sinif">Sınıflandırma</option>
+        <option value="regresyon">Regresyon / Tahmin</option>
+        <option value="kumeleme">Kümeleme</option>
+        <option value="anomali">Anomali Tespiti</option>
+        <option value="boyut">Boyut İndirgeme</option>
+        <option value="gomme">Gömme / Temsil</option>
+        <option value="uretim">Tablo Üretimi (Sentetik)</option>
+      </optgroup>
+      <optgroup label="── Görüntü">
+        <option value="goruntu-sinif">Görüntü Sınıflandırma</option>
+        <option value="goruntu-tespit">Nesne Tespiti</option>
+        <option value="goruntu-segm">Segmentasyon</option>
+        <option value="goruntu-uretim">Görüntü Üretimi</option>
+        <option value="goruntu-gomme">Görüntü Gömme</option>
+        <option value="goruntu-anomali">Görüntü Anomali</option>
+      </optgroup>
+      <optgroup label="── Metin">
+        <option value="metin-sinif">Metin Sınıflandırma</option>
+        <option value="metin-uretim">Metin Üretimi</option>
+        <option value="metin-gomme">Metin Gömme</option>
+        <option value="metin-ceviri">Çeviri / Özetleme</option>
+        <option value="metin-ner">NER / Etiketleme</option>
+      </optgroup>
+      <optgroup label="── Zaman Serisi">
+        <option value="zaman-tahmin">Tahmin (Forecasting)</option>
+        <option value="zaman-sinif">Zaman Serisi Sınıflandırma</option>
+        <option value="zaman-anomali">Zaman Serisi Anomali</option>
+        <option value="zaman-kumeleme">Zaman Serisi Kümeleme</option>
+      </optgroup>
+      <optgroup label="── Graf">
+        <option value="graf-sinif">Düğüm Sınıflandırma</option>
+        <option value="graf-gomme">Graf Gömme</option>
+        <option value="graf-kumeleme">Graf Kümeleme</option>
+        <option value="graf-anomali">Graf Anomali</option>
+      </optgroup>
+      <optgroup label="── Ses">
+        <option value="ses-sinif">Ses Sınıflandırma</option>
+        <option value="ses-uretim">Ses Üretimi (TTS)</option>
+        <option value="ses-gomme">Ses Gömme</option>
+        <option value="ses-asr">Konuşma Tanıma (ASR)</option>
+      </optgroup>
+    </select>
+  </div>
+  <div class="filter-group">
+    <label>Kısıt</label>
+    <select id="f-kisit" onchange="filter()">
+      <option value="">— seç —</option>
+      <option value="az">Az veri (&lt; 1K örnek)</option>
+      <option value="orta">Orta veri (1K–100K)</option>
+      <option value="cok">Çok veri (&gt; 100K)</option>
+      <option value="yorum">Yorumlanabilirlik zorunlu</option>
+      <option value="hiz">Gerçek zamanlı / hız</option>
+      <option value="kaynak">Sınırlı donanım (CPU)</option>
+    </select>
+  </div>
+</div>
+
+<div class="recommendation" id="rec-box">
+  <div class="rec-label">// önerilen algoritma</div>
+  <div class="rec-algo" id="rec-algo"></div>
+  <div class="rec-why" id="rec-why"></div>
+</div>
+
+<div class="matrix-wrap">
+<table id="matrix">
+  <thead>
+    <tr>
+      <th>Algoritma</th>
+      <th>Tür</th>
+      <th>Az Veri</th>
+      <th>Çok Veri</th>
+      <th>Yorumlan.</th>
+      <th>Hız</th>
+      <th>Tablo</th>
+      <th>Görüntü</th>
+      <th>Metin</th>
+      <th>Zaman S.</th>
+      <th>Graf</th>
+      <th>Ses</th>
+    </tr>
+  </thead>
+  <tbody>
+
+  <!-- ═══════════════ TABLO / KLASİK ML ═══════════════ -->
+  <tr class="section-row"><td colspan="12">// tablo — klasik ml</td></tr>
+
+  <tr data-veri="tablo" data-gorev="sinif regresyon" data-kisit="az orta yorum kaynak">
+    <td><span class="algo-name">Lojistik Regresyon</span><br><span style="color:var(--muted);font-size:0.62rem">Logistic Regression</span></td>
+    <td><span class="tag tag-klasik">klasik</span></td>
+    <td><span class="dot dot-good"></span>iyi</td><td><span class="dot dot-ok"></span>tamam</td>
+    <td><span class="dot dot-good"></span>tam</td><td><span class="dot dot-good"></span>çok hızlı</td>
+    <td><span class="dot dot-good"></span>evet</td><td><span class="dot dot-bad"></span>hayır</td>
+    <td><span class="dot dot-ok"></span>TF-IDF ile</td><td><span class="dot dot-bad"></span>hayır</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+  </tr>
+
+  <tr data-veri="tablo" data-gorev="sinif regresyon boyut" data-kisit="az orta yorum kaynak">
+    <td><span class="algo-name">Ridge / Lasso / ElasticNet</span><br><span style="color:var(--muted);font-size:0.62rem">Regularized Regression</span></td>
+    <td><span class="tag tag-klasik">klasik</span></td>
+    <td><span class="dot dot-good"></span>iyi</td><td><span class="dot dot-ok"></span>tamam</td>
+    <td><span class="dot dot-good"></span>tam</td><td><span class="dot dot-good"></span>çok hızlı</td>
+    <td><span class="dot dot-good"></span>evet</td><td><span class="dot dot-bad"></span>hayır</td>
+    <td><span class="dot dot-ok"></span>TF-IDF ile</td><td><span class="dot dot-bad"></span>hayır</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+  </tr>
+
+  <tr data-veri="tablo" data-gorev="sinif regresyon" data-kisit="az orta yorum kaynak">
+    <td><span class="algo-name">SVM / SVR</span><br><span style="color:var(--muted);font-size:0.62rem">Support Vector Machine</span></td>
+    <td><span class="tag tag-klasik">klasik</span></td>
+    <td><span class="dot dot-good"></span>iyi</td><td><span class="dot dot-bad"></span>yavaş</td>
+    <td><span class="dot dot-ok"></span>kısmi</td><td><span class="dot dot-ok"></span>orta</td>
+    <td><span class="dot dot-good"></span>evet</td><td><span class="dot dot-ok"></span>HOG ile</td>
+    <td><span class="dot dot-ok"></span>TF-IDF ile</td><td><span class="dot dot-bad"></span>hayır</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-ok"></span>MFCC ile</td>
+  </tr>
+
+  <tr data-veri="tablo" data-gorev="sinif regresyon anomali" data-kisit="az orta yorum kaynak">
+    <td><span class="algo-name">Karar Ağacı</span><br><span style="color:var(--muted);font-size:0.62rem">Decision Tree</span></td>
+    <td><span class="tag tag-klasik">klasik</span></td>
+    <td><span class="dot dot-ok"></span>aşırı öğrenir</td><td><span class="dot dot-ok"></span>tamam</td>
+    <td><span class="dot dot-good"></span>tam</td><td><span class="dot dot-good"></span>hızlı</td>
+    <td><span class="dot dot-good"></span>evet</td><td><span class="dot dot-bad"></span>hayır</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+  </tr>
+
+  <tr data-veri="tablo" data-gorev="sinif regresyon" data-kisit="az orta kaynak">
+    <td><span class="algo-name">KNN</span><br><span style="color:var(--muted);font-size:0.62rem">K-Nearest Neighbors</span></td>
+    <td><span class="tag tag-klasik">klasik</span></td>
+    <td><span class="dot dot-good"></span>iyi</td><td><span class="dot dot-bad"></span>yavaş</td>
+    <td><span class="dot dot-good"></span>tam</td><td><span class="dot dot-bad"></span>yavaş</td>
+    <td><span class="dot dot-good"></span>evet</td><td><span class="dot dot-bad"></span>hayır</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+  </tr>
+
+  <!-- ═══════════════ TABLO / ENSEMBLE ═══════════════ -->
+  <tr class="section-row"><td colspan="12">// tablo — ensemble</td></tr>
+
+  <tr data-veri="tablo" data-gorev="sinif regresyon anomali" data-kisit="az orta cok yorum kaynak">
+    <td><span class="algo-name">Random Forest</span><br><span style="color:var(--muted);font-size:0.62rem">Bagging Ensemble</span></td>
+    <td><span class="tag tag-ensemble">ensemble</span></td>
+    <td><span class="dot dot-ok"></span>tamam</td><td><span class="dot dot-good"></span>iyi</td>
+    <td><span class="dot dot-ok"></span>SHAP ile</td><td><span class="dot dot-ok"></span>orta</td>
+    <td><span class="dot dot-good"></span>evet</td><td><span class="dot dot-bad"></span>hayır</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-ok"></span>lag ile</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+  </tr>
+
+  <tr data-veri="tablo" data-gorev="sinif regresyon anomali" data-kisit="az orta cok yorum kaynak">
+    <td><span class="algo-name">Extra Trees</span><br><span style="color:var(--muted);font-size:0.62rem">Extremely Randomized Trees</span></td>
+    <td><span class="tag tag-ensemble">ensemble</span></td>
+    <td><span class="dot dot-ok"></span>tamam</td><td><span class="dot dot-good"></span>iyi</td>
+    <td><span class="dot dot-ok"></span>SHAP ile</td><td><span class="dot dot-good"></span>RF'den hızlı</td>
+    <td><span class="dot dot-good"></span>evet</td><td><span class="dot dot-bad"></span>hayır</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-ok"></span>lag ile</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+  </tr>
+
+  <tr data-veri="tablo" data-gorev="sinif regresyon" data-kisit="az orta cok yorum kaynak hiz">
+    <td><span class="algo-name">XGBoost</span><br><span style="color:var(--muted);font-size:0.62rem">Gradient Boosting</span></td>
+    <td><span class="tag tag-ensemble">ensemble</span></td>
+    <td><span class="dot dot-ok"></span>tamam</td><td><span class="dot dot-good"></span>çok iyi</td>
+    <td><span class="dot dot-ok"></span>SHAP ile</td><td><span class="dot dot-good"></span>hızlı</td>
+    <td><span class="dot dot-good"></span>evet</td><td><span class="dot dot-bad"></span>hayır</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-ok"></span>lag ile</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+  </tr>
+
+  <tr data-veri="tablo" data-gorev="sinif regresyon" data-kisit="az orta cok yorum kaynak hiz">
+    <td><span class="algo-name">LightGBM</span><br><span style="color:var(--muted);font-size:0.62rem">Leaf-wise Boosting</span></td>
+    <td><span class="tag tag-ensemble">ensemble</span></td>
+    <td><span class="dot dot-ok"></span>tamam</td><td><span class="dot dot-good"></span>çok iyi</td>
+    <td><span class="dot dot-ok"></span>SHAP ile</td><td><span class="dot dot-good"></span>çok hızlı</td>
+    <td><span class="dot dot-good"></span>evet</td><td><span class="dot dot-bad"></span>hayır</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-ok"></span>lag ile</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+  </tr>
+
+  <tr data-veri="tablo" data-gorev="sinif regresyon" data-kisit="az orta cok yorum kaynak">
+    <td><span class="algo-name">CatBoost</span><br><span style="color:var(--muted);font-size:0.62rem">Categorical Boosting</span></td>
+    <td><span class="tag tag-ensemble">ensemble</span></td>
+    <td><span class="dot dot-ok"></span>tamam</td><td><span class="dot dot-good"></span>iyi</td>
+    <td><span class="dot dot-ok"></span>SHAP ile</td><td><span class="dot dot-ok"></span>orta</td>
+    <td><span class="dot dot-good"></span>kategorik güçlü</td><td><span class="dot dot-bad"></span>hayır</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+  </tr>
+
+  <!-- ═══════════════ TABLO / KÜMELEME ═══════════════ -->
+  <tr class="section-row"><td colspan="12">// tablo — kümeleme</td></tr>
+
+  <tr data-veri="tablo" data-gorev="kumeleme" data-kisit="az orta cok yorum kaynak hiz">
+    <td><span class="algo-name">K-Means</span><br><span style="color:var(--muted);font-size:0.62rem">Centroid Clustering</span></td>
+    <td><span class="tag tag-klasik">klasik</span></td>
+    <td><span class="dot dot-good"></span>iyi</td><td><span class="dot dot-good"></span>iyi</td>
+    <td><span class="dot dot-good"></span>tam</td><td><span class="dot dot-good"></span>hızlı</td>
+    <td><span class="dot dot-good"></span>evet</td><td><span class="dot dot-bad"></span>hayır</td>
+    <td><span class="dot dot-ok"></span>embedding ile</td><td><span class="dot dot-bad"></span>hayır</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+  </tr>
+
+  <tr data-veri="tablo" data-gorev="kumeleme anomali" data-kisit="az orta yorum kaynak">
+    <td><span class="algo-name">DBSCAN</span><br><span style="color:var(--muted);font-size:0.62rem">Density Clustering</span></td>
+    <td><span class="tag tag-klasik">klasik</span></td>
+    <td><span class="dot dot-good"></span>iyi</td><td><span class="dot dot-ok"></span>yavaşlar</td>
+    <td><span class="dot dot-ok"></span>kısmi</td><td><span class="dot dot-ok"></span>orta</td>
+    <td><span class="dot dot-good"></span>evet</td><td><span class="dot dot-bad"></span>hayır</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+  </tr>
+
+  <tr data-veri="tablo" data-gorev="kumeleme anomali" data-kisit="az orta cok yorum kaynak">
+    <td><span class="algo-name">HDBSCAN</span><br><span style="color:var(--muted);font-size:0.62rem">Hierarchical DBSCAN</span></td>
+    <td><span class="tag tag-klasik">klasik</span></td>
+    <td><span class="dot dot-good"></span>iyi</td><td><span class="dot dot-ok"></span>orta</td>
+    <td><span class="dot dot-ok"></span>kısmi</td><td><span class="dot dot-ok"></span>orta</td>
+    <td><span class="dot dot-good"></span>evet</td><td><span class="dot dot-bad"></span>hayır</td>
+    <td><span class="dot dot-ok"></span>embedding ile</td><td><span class="dot dot-bad"></span>hayır</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+  </tr>
+
+  <tr data-veri="tablo" data-gorev="kumeleme" data-kisit="az orta yorum kaynak">
+    <td><span class="algo-name">Hierarchical Clustering</span><br><span style="color:var(--muted);font-size:0.62rem">Agglomerative / Divisive</span></td>
+    <td><span class="tag tag-klasik">klasik</span></td>
+    <td><span class="dot dot-good"></span>iyi</td><td><span class="dot dot-bad"></span>yavaş</td>
+    <td><span class="dot dot-good"></span>dendrogram</td><td><span class="dot dot-bad"></span>yavaş</td>
+    <td><span class="dot dot-good"></span>evet</td><td><span class="dot dot-bad"></span>hayır</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+  </tr>
+
+  <tr data-veri="tablo" data-gorev="kumeleme" data-kisit="az orta cok yorum kaynak">
+    <td><span class="algo-name">GMM</span><br><span style="color:var(--muted);font-size:0.62rem">Gaussian Mixture Model</span></td>
+    <td><span class="tag tag-klasik">klasik</span></td>
+    <td><span class="dot dot-ok"></span>tamam</td><td><span class="dot dot-ok"></span>tamam</td>
+    <td><span class="dot dot-good"></span>olasılıksal</td><td><span class="dot dot-ok"></span>orta</td>
+    <td><span class="dot dot-good"></span>evet</td><td><span class="dot dot-bad"></span>hayır</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+  </tr>
+
+  <tr data-veri="tablo" data-gorev="kumeleme" data-kisit="az orta kaynak">
+    <td><span class="algo-name">Spectral Clustering</span><br><span style="color:var(--muted);font-size:0.62rem">Graph-based Clustering</span></td>
+    <td><span class="tag tag-klasik">klasik</span></td>
+    <td><span class="dot dot-good"></span>iyi</td><td><span class="dot dot-bad"></span>yavaş</td>
+    <td><span class="dot dot-ok"></span>kısmi</td><td><span class="dot dot-bad"></span>yavaş</td>
+    <td><span class="dot dot-good"></span>evet</td><td><span class="dot dot-bad"></span>hayır</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+    <td><span class="dot dot-ok"></span>graf ile</td><td><span class="dot dot-bad"></span>hayır</td>
+  </tr>
+
+  <!-- ═══════════════ TABLO / ANOMALİ ═══════════════ -->
+  <tr class="section-row"><td colspan="12">// tablo — anomali</td></tr>
+
+  <tr data-veri="tablo" data-gorev="anomali" data-kisit="az orta cok yorum kaynak hiz">
+    <td><span class="algo-name">Isolation Forest</span><br><span style="color:var(--muted);font-size:0.62rem">Anomaly Detection</span></td>
+    <td><span class="tag tag-ensemble">ensemble</span></td>
+    <td><span class="dot dot-good"></span>iyi</td><td><span class="dot dot-good"></span>iyi</td>
+    <td><span class="dot dot-ok"></span>SHAP ile</td><td><span class="dot dot-good"></span>hızlı</td>
+    <td><span class="dot dot-good"></span>evet</td><td><span class="dot dot-bad"></span>hayır</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-ok"></span>lag ile</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+  </tr>
+
+  <tr data-veri="tablo" data-gorev="anomali" data-kisit="az orta yorum kaynak">
+    <td><span class="algo-name">One-Class SVM</span><br><span style="color:var(--muted);font-size:0.62rem">Novelty Detection</span></td>
+    <td><span class="tag tag-klasik">klasik</span></td>
+    <td><span class="dot dot-good"></span>iyi</td><td><span class="dot dot-bad"></span>yavaş</td>
+    <td><span class="dot dot-ok"></span>kısmi</td><td><span class="dot dot-ok"></span>orta</td>
+    <td><span class="dot dot-good"></span>evet</td><td><span class="dot dot-bad"></span>hayır</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+  </tr>
+
+  <tr data-veri="tablo" data-gorev="anomali" data-kisit="az orta yorum kaynak">
+    <td><span class="algo-name">LOF</span><br><span style="color:var(--muted);font-size:0.62rem">Local Outlier Factor</span></td>
+    <td><span class="tag tag-klasik">klasik</span></td>
+    <td><span class="dot dot-good"></span>iyi</td><td><span class="dot dot-bad"></span>yavaş</td>
+    <td><span class="dot dot-ok"></span>kısmi</td><td><span class="dot dot-bad"></span>yavaş</td>
+    <td><span class="dot dot-good"></span>evet</td><td><span class="dot dot-bad"></span>hayır</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+  </tr>
+
+  <!-- ═══════════════ TABLO / BOYUT ═══════════════ -->
+  <tr class="section-row"><td colspan="12">// tablo — boyut indirgeme</td></tr>
+
+  <tr data-veri="tablo" data-gorev="boyut" data-kisit="az orta cok yorum kaynak hiz">
+    <td><span class="algo-name">PCA</span><br><span style="color:var(--muted);font-size:0.62rem">Principal Component Analysis</span></td>
+    <td><span class="tag tag-klasik">klasik</span></td>
+    <td><span class="dot dot-good"></span>iyi</td><td><span class="dot dot-good"></span>iyi</td>
+    <td><span class="dot dot-ok"></span>lineer</td><td><span class="dot dot-good"></span>hızlı</td>
+    <td><span class="dot dot-good"></span>evet</td><td><span class="dot dot-ok"></span>ön işlem</td>
+    <td><span class="dot dot-ok"></span>ön işlem</td><td><span class="dot dot-bad"></span>hayır</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+  </tr>
+
+  <tr data-veri="tablo" data-gorev="boyut" data-kisit="az orta yorum kaynak">
+    <td><span class="algo-name">ICA</span><br><span style="color:var(--muted);font-size:0.62rem">Independent Component Analysis</span></td>
+    <td><span class="tag tag-klasik">klasik</span></td>
+    <td><span class="dot dot-good"></span>iyi</td><td><span class="dot dot-ok"></span>tamam</td>
+    <td><span class="dot dot-ok"></span>kısmi</td><td><span class="dot dot-ok"></span>orta</td>
+    <td><span class="dot dot-good"></span>evet</td><td><span class="dot dot-bad"></span>hayır</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+  </tr>
+
+  <tr data-veri="tablo" data-gorev="boyut" data-kisit="az orta kaynak">
+    <td><span class="algo-name">t-SNE</span><br><span style="color:var(--muted);font-size:0.62rem">Nonlinear Visualisation</span></td>
+    <td><span class="tag tag-klasik">klasik</span></td>
+    <td><span class="dot dot-good"></span>iyi</td><td><span class="dot dot-bad"></span>yavaş</td>
+    <td><span class="dot dot-ok"></span>görsel</td><td><span class="dot dot-bad"></span>yavaş</td>
+    <td><span class="dot dot-good"></span>evet</td><td><span class="dot dot-ok"></span>embedding ile</td>
+    <td><span class="dot dot-ok"></span>embedding ile</td><td><span class="dot dot-bad"></span>hayır</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+  </tr>
+
+  <tr data-veri="tablo" data-gorev="boyut" data-kisit="az orta cok kaynak">
+    <td><span class="algo-name">UMAP</span><br><span style="color:var(--muted);font-size:0.62rem">Nonlinear Dim. Reduction</span></td>
+    <td><span class="tag tag-klasik">klasik</span></td>
+    <td><span class="dot dot-good"></span>iyi</td><td><span class="dot dot-ok"></span>orta</td>
+    <td><span class="dot dot-ok"></span>görsel</td><td><span class="dot dot-ok"></span>t-SNE'den hızlı</td>
+    <td><span class="dot dot-good"></span>evet</td><td><span class="dot dot-ok"></span>embedding ile</td>
+    <td><span class="dot dot-ok"></span>embedding ile</td><td><span class="dot dot-bad"></span>hayır</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+  </tr>
+
+  <!-- ═══════════════ TABLO / DERİN ÖĞRENME ═══════════════ -->
+  <tr class="section-row"><td colspan="12">// tablo — derin öğrenme</td></tr>
+
+  <tr data-veri="tablo" data-gorev="sinif regresyon" data-kisit="orta cok">
+    <td><span class="algo-name">MLP</span><br><span style="color:var(--muted);font-size:0.62rem">Multilayer Perceptron</span></td>
+    <td><span class="tag tag-dl">derin öğrenme</span></td>
+    <td><span class="dot dot-bad"></span>aşırı öğrenir</td><td><span class="dot dot-good"></span>iyi</td>
+    <td><span class="dot dot-bad"></span>kara kutu</td><td><span class="dot dot-ok"></span>orta</td>
+    <td><span class="dot dot-good"></span>evet</td><td><span class="dot dot-bad"></span>zayıf</td>
+    <td><span class="dot dot-bad"></span>zayıf</td><td><span class="dot dot-ok"></span>kısmi</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+  </tr>
+
+  <tr data-veri="tablo" data-gorev="sinif regresyon" data-kisit="orta cok">
+    <td><span class="algo-name">TabNet</span><br><span style="color:var(--muted);font-size:0.62rem">Attention-based Tabular</span></td>
+    <td><span class="tag tag-dl">derin öğrenme</span></td>
+    <td><span class="dot dot-bad"></span>yetersiz</td><td><span class="dot dot-good"></span>iyi</td>
+    <td><span class="dot dot-ok"></span>attention ile</td><td><span class="dot dot-ok"></span>orta</td>
+    <td><span class="dot dot-good"></span>evet</td><td><span class="dot dot-bad"></span>hayır</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+  </tr>
+
+  <tr data-veri="tablo" data-gorev="sinif regresyon" data-kisit="cok">
+    <td><span class="algo-name">FT-Transformer</span><br><span style="color:var(--muted);font-size:0.62rem">Feature Tokenizer Transformer</span></td>
+    <td><span class="tag tag-dl">derin öğrenme</span></td>
+    <td><span class="dot dot-bad"></span>çok veri gerekir</td><td><span class="dot dot-good"></span>güçlü</td>
+    <td><span class="dot dot-bad"></span>kara kutu</td><td><span class="dot dot-ok"></span>orta</td>
+    <td><span class="dot dot-good"></span>evet</td><td><span class="dot dot-bad"></span>hayır</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+  </tr>
+
+  <tr data-veri="tablo" data-gorev="anomali gomme" data-kisit="orta cok">
+    <td><span class="algo-name">Autoencoder</span><br><span style="color:var(--muted);font-size:0.62rem">Reconstruction-based</span></td>
+    <td><span class="tag tag-dl">derin öğrenme</span></td>
+    <td><span class="dot dot-bad"></span>aşırı öğrenir</td><td><span class="dot dot-good"></span>iyi</td>
+    <td><span class="dot dot-bad"></span>kara kutu</td><td><span class="dot dot-ok"></span>orta</td>
+    <td><span class="dot dot-good"></span>evet</td><td><span class="dot dot-ok"></span>görüntü ile</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-ok"></span>zaman ile</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+  </tr>
+
+  <!-- ═══════════════ GÖRÜNTÜ ═══════════════ -->
+  <tr class="section-row"><td colspan="12">// görüntü — sınıflandırma</td></tr>
+
+  <tr data-veri="goruntu" data-gorev="goruntu-sinif" data-kisit="az orta">
+    <td><span class="algo-name">EfficientNet (TL)</span><br><span style="color:var(--muted);font-size:0.62rem">Transfer Learning CNN</span></td>
+    <td><span class="tag tag-dl">derin öğrenme</span></td>
+    <td><span class="dot dot-good"></span>TL ile iyi</td><td><span class="dot dot-good"></span>çok iyi</td>
+    <td><span class="dot dot-bad"></span>GradCAM ile</td><td><span class="dot dot-ok"></span>GPU gerekir</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-good"></span>evet</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+  </tr>
+
+  <tr data-veri="goruntu" data-gorev="goruntu-sinif" data-kisit="az orta">
+    <td><span class="algo-name">ResNet (TL)</span><br><span style="color:var(--muted);font-size:0.62rem">Residual Network</span></td>
+    <td><span class="tag tag-dl">derin öğrenme</span></td>
+    <td><span class="dot dot-good"></span>TL ile iyi</td><td><span class="dot dot-good"></span>iyi</td>
+    <td><span class="dot dot-bad"></span>GradCAM ile</td><td><span class="dot dot-ok"></span>GPU gerekir</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-good"></span>evet</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+  </tr>
+
+  <tr data-veri="goruntu" data-gorev="goruntu-sinif" data-kisit="cok">
+    <td><span class="algo-name">ViT</span><br><span style="color:var(--muted);font-size:0.62rem">Vision Transformer</span></td>
+    <td><span class="tag tag-dl">derin öğrenme</span></td>
+    <td><span class="dot dot-bad"></span>çok veri gerekir</td><td><span class="dot dot-good"></span>en iyi</td>
+    <td><span class="dot dot-bad"></span>kara kutu</td><td><span class="dot dot-bad"></span>yavaş</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-good"></span>evet</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+  </tr>
+
+  <tr data-veri="goruntu" data-gorev="goruntu-sinif" data-kisit="cok">
+    <td><span class="algo-name">ConvNeXt</span><br><span style="color:var(--muted);font-size:0.62rem">Modern CNN Architecture</span></td>
+    <td><span class="tag tag-dl">derin öğrenme</span></td>
+    <td><span class="dot dot-ok"></span>TL ile</td><td><span class="dot dot-good"></span>çok iyi</td>
+    <td><span class="dot dot-bad"></span>kara kutu</td><td><span class="dot dot-ok"></span>orta</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-good"></span>evet</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+  </tr>
+
+  <tr data-veri="goruntu" data-gorev="goruntu-sinif" data-kisit="az orta cok kaynak hiz">
+    <td><span class="algo-name">MobileNetV3</span><br><span style="color:var(--muted);font-size:0.62rem">Lightweight CNN</span></td>
+    <td><span class="tag tag-dl">derin öğrenme</span></td>
+    <td><span class="dot dot-ok"></span>TL ile</td><td><span class="dot dot-ok"></span>tamam</td>
+    <td><span class="dot dot-bad"></span>kara kutu</td><td><span class="dot dot-good"></span>çok hızlı</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-good"></span>edge için</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+  </tr>
+
+  <tr class="section-row"><td colspan="12">// görüntü — nesne tespiti</td></tr>
+
+  <tr data-veri="goruntu" data-gorev="goruntu-tespit" data-kisit="az orta cok hiz">
+    <td><span class="algo-name">YOLOv8+</span><br><span style="color:var(--muted);font-size:0.62rem">Real-time Detection</span></td>
+    <td><span class="tag tag-dl">derin öğrenme</span></td>
+    <td><span class="dot dot-ok"></span>TL ile</td><td><span class="dot dot-good"></span>iyi</td>
+    <td><span class="dot dot-bad"></span>kara kutu</td><td><span class="dot dot-good"></span>gerçek zamanlı</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-good"></span>tespit</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+  </tr>
+
+  <tr data-veri="goruntu" data-gorev="goruntu-tespit" data-kisit="orta cok">
+    <td><span class="algo-name">DETR</span><br><span style="color:var(--muted);font-size:0.62rem">Detection Transformer</span></td>
+    <td><span class="tag tag-dl">derin öğrenme</span></td>
+    <td><span class="dot dot-bad"></span>yetersiz</td><td><span class="dot dot-good"></span>güçlü</td>
+    <td><span class="dot dot-bad"></span>kara kutu</td><td><span class="dot dot-bad"></span>yavaş</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-good"></span>tespit</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+  </tr>
+
+  <tr data-veri="goruntu" data-gorev="goruntu-tespit" data-kisit="orta cok">
+    <td><span class="algo-name">Faster R-CNN</span><br><span style="color:var(--muted);font-size:0.62rem">Region Proposal Network</span></td>
+    <td><span class="tag tag-dl">derin öğrenme</span></td>
+    <td><span class="dot dot-ok"></span>TL ile</td><td><span class="dot dot-good"></span>iyi</td>
+    <td><span class="dot dot-bad"></span>kara kutu</td><td><span class="dot dot-bad"></span>yavaş</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-good"></span>tespit</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+  </tr>
+
+  <tr class="section-row"><td colspan="12">// görüntü — segmentasyon</td></tr>
+
+  <tr data-veri="goruntu" data-gorev="goruntu-segm" data-kisit="orta cok">
+    <td><span class="algo-name">U-Net</span><br><span style="color:var(--muted);font-size:0.62rem">Semantic Segmentation</span></td>
+    <td><span class="tag tag-dl">derin öğrenme</span></td>
+    <td><span class="dot dot-ok"></span>az veri tolere</td><td><span class="dot dot-good"></span>iyi</td>
+    <td><span class="dot dot-bad"></span>kara kutu</td><td><span class="dot dot-ok"></span>orta</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-good"></span>segm.</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+  </tr>
+
+  <tr data-veri="goruntu" data-gorev="goruntu-segm" data-kisit="az orta cok">
+    <td><span class="algo-name">SAM</span><br><span style="color:var(--muted);font-size:0.62rem">Segment Anything Model</span></td>
+    <td><span class="tag tag-dl">derin öğrenme</span></td>
+    <td><span class="dot dot-good"></span>zero-shot</td><td><span class="dot dot-good"></span>en iyi</td>
+    <td><span class="dot dot-bad"></span>kara kutu</td><td><span class="dot dot-ok"></span>orta</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-good"></span>segm.</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+  </tr>
+
+  <tr data-veri="goruntu" data-gorev="goruntu-segm" data-kisit="orta cok">
+    <td><span class="algo-name">Mask R-CNN</span><br><span style="color:var(--muted);font-size:0.62rem">Instance Segmentation</span></td>
+    <td><span class="tag tag-dl">derin öğrenme</span></td>
+    <td><span class="dot dot-ok"></span>TL ile</td><td><span class="dot dot-good"></span>iyi</td>
+    <td><span class="dot dot-bad"></span>kara kutu</td><td><span class="dot dot-bad"></span>yavaş</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-good"></span>instance segm.</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+  </tr>
+
+  <tr class="section-row"><td colspan="12">// görüntü — gömme & üretim</td></tr>
+
+  <tr data-veri="goruntu" data-gorev="goruntu-gomme" data-kisit="az orta cok">
+    <td><span class="algo-name">CLIP</span><br><span style="color:var(--muted);font-size:0.62rem">Vision-Language Embedding</span></td>
+    <td><span class="tag tag-dl">derin öğrenme</span></td>
+    <td><span class="dot dot-good"></span>zero-shot</td><td><span class="dot dot-good"></span>iyi</td>
+    <td><span class="dot dot-bad"></span>kara kutu</td><td><span class="dot dot-ok"></span>orta</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-good"></span>evet</td>
+    <td><span class="dot dot-good"></span>evet</td><td><span class="dot dot-bad"></span>hayır</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+  </tr>
+
+  <tr data-veri="goruntu" data-gorev="goruntu-gomme" data-kisit="az orta cok">
+    <td><span class="algo-name">DINOv2</span><br><span style="color:var(--muted);font-size:0.62rem">Self-supervised Vision</span></td>
+    <td><span class="tag tag-dl">derin öğrenme</span></td>
+    <td><span class="dot dot-good"></span>zero-shot</td><td><span class="dot dot-good"></span>güçlü</td>
+    <td><span class="dot dot-bad"></span>kara kutu</td><td><span class="dot dot-ok"></span>orta</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-good"></span>evet</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+  </tr>
+
+  <tr data-veri="goruntu" data-gorev="goruntu-uretim" data-kisit="az orta cok">
+    <td><span class="algo-name">Stable Diffusion</span><br><span style="color:var(--muted);font-size:0.62rem">Diffusion Model</span></td>
+    <td><span class="tag tag-dl">derin öğrenme</span></td>
+    <td><span class="dot dot-ok"></span>DreamBooth ile</td><td><span class="dot dot-good"></span>en iyi</td>
+    <td><span class="dot dot-bad"></span>kara kutu</td><td><span class="dot dot-bad"></span>yavaş</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-good"></span>üretim</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+  </tr>
+
+  <tr data-veri="goruntu" data-gorev="goruntu-uretim" data-kisit="orta cok">
+    <td><span class="algo-name">GAN</span><br><span style="color:var(--muted);font-size:0.62rem">Generative Adversarial Net</span></td>
+    <td><span class="tag tag-dl">derin öğrenme</span></td>
+    <td><span class="dot dot-bad"></span>yetersiz</td><td><span class="dot dot-good"></span>iyi</td>
+    <td><span class="dot dot-bad"></span>kara kutu</td><td><span class="dot dot-ok"></span>inference hızlı</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-good"></span>üretim</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+  </tr>
+
+  <!-- ═══════════════ METİN / NLP ═══════════════ -->
+  <tr class="section-row"><td colspan="12">// metin — klasik nlp</td></tr>
+
+  <tr data-veri="metin" data-gorev="metin-sinif" data-kisit="az orta yorum kaynak hiz">
+    <td><span class="algo-name">TF-IDF + LR</span><br><span style="color:var(--muted);font-size:0.62rem">Bag-of-Words Baseline</span></td>
+    <td><span class="tag tag-klasik">klasik</span></td>
+    <td><span class="dot dot-good"></span>iyi</td><td><span class="dot dot-ok"></span>tamam</td>
+    <td><span class="dot dot-good"></span>tam</td><td><span class="dot dot-good"></span>çok hızlı</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+    <td><span class="dot dot-good"></span>evet</td><td><span class="dot dot-bad"></span>hayır</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+  </tr>
+
+  <tr data-veri="metin" data-gorev="metin-sinif metin-gomme" data-kisit="az orta kaynak hiz">
+    <td><span class="algo-name">FastText</span><br><span style="color:var(--muted);font-size:0.62rem">Subword Embeddings</span></td>
+    <td><span class="tag tag-klasik">klasik</span></td>
+    <td><span class="dot dot-good"></span>iyi</td><td><span class="dot dot-ok"></span>tamam</td>
+    <td><span class="dot dot-ok"></span>kısmi</td><td><span class="dot dot-good"></span>çok hızlı</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+    <td><span class="dot dot-good"></span>evet</td><td><span class="dot dot-bad"></span>hayır</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+  </tr>
+
+  <tr class="section-row"><td colspan="12">// metin — encoder transformer</td></tr>
+
+  <tr data-veri="metin" data-gorev="metin-sinif metin-gomme metin-ner" data-kisit="az orta cok">
+    <td><span class="algo-name">BERT / RoBERTa</span><br><span style="color:var(--muted);font-size:0.62rem">Encoder Transformer</span></td>
+    <td><span class="tag tag-dl">derin öğrenme</span></td>
+    <td><span class="dot dot-good"></span>fine-tune ile</td><td><span class="dot dot-good"></span>çok iyi</td>
+    <td><span class="dot dot-bad"></span>kara kutu</td><td><span class="dot dot-ok"></span>orta</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+    <td><span class="dot dot-good"></span>evet</td><td><span class="dot dot-bad"></span>hayır</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+  </tr>
+
+  <tr data-veri="metin" data-gorev="metin-sinif metin-gomme metin-ner" data-kisit="az orta cok">
+    <td><span class="algo-name">DeBERTa-v3</span><br><span style="color:var(--muted);font-size:0.62rem">Disentangled Attention</span></td>
+    <td><span class="tag tag-dl">derin öğrenme</span></td>
+    <td><span class="dot dot-ok"></span>fine-tune ile</td><td><span class="dot dot-good"></span>SOTA sınıf.</td>
+    <td><span class="dot dot-bad"></span>kara kutu</td><td><span class="dot dot-ok"></span>orta</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+    <td><span class="dot dot-good"></span>evet</td><td><span class="dot dot-bad"></span>hayır</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+  </tr>
+
+  <tr data-veri="metin" data-gorev="metin-sinif metin-gomme" data-kisit="az orta cok hiz kaynak">
+    <td><span class="algo-name">DistilBERT</span><br><span style="color:var(--muted);font-size:0.62rem">Distilled Encoder</span></td>
+    <td><span class="tag tag-dl">derin öğrenme</span></td>
+    <td><span class="dot dot-good"></span>fine-tune ile</td><td><span class="dot dot-good"></span>iyi</td>
+    <td><span class="dot dot-bad"></span>kara kutu</td><td><span class="dot dot-good"></span>2x BERT</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+    <td><span class="dot dot-good"></span>evet</td><td><span class="dot dot-bad"></span>hayır</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+  </tr>
+
+  <tr data-veri="metin" data-gorev="metin-sinif metin-gomme" data-kisit="az orta cok">
+    <td><span class="algo-name">ModernBERT</span><br><span style="color:var(--muted);font-size:0.62rem">Next-gen Encoder (2024)</span></td>
+    <td><span class="tag tag-dl">derin öğrenme</span></td>
+    <td><span class="dot dot-ok"></span>fine-tune ile</td><td><span class="dot dot-good"></span>BERT'ten güçlü</td>
+    <td><span class="dot dot-bad"></span>kara kutu</td><td><span class="dot dot-good"></span>hızlı</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+    <td><span class="dot dot-good"></span>evet</td><td><span class="dot dot-bad"></span>hayır</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+  </tr>
+
+  <tr data-veri="metin" data-gorev="metin-sinif metin-gomme" data-kisit="orta cok">
+    <td><span class="algo-name">Longformer</span><br><span style="color:var(--muted);font-size:0.62rem">Long Document Encoder</span></td>
+    <td><span class="tag tag-dl">derin öğrenme</span></td>
+    <td><span class="dot dot-ok"></span>fine-tune ile</td><td><span class="dot dot-good"></span>uzun metin</td>
+    <td><span class="dot dot-bad"></span>kara kutu</td><td><span class="dot dot-ok"></span>orta</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+    <td><span class="dot dot-good"></span>uzun dok.</td><td><span class="dot dot-bad"></span>hayır</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+  </tr>
+
+  <tr class="section-row"><td colspan="12">// metin — gömme & üretim</td></tr>
+
+  <tr data-veri="metin" data-gorev="metin-gomme" data-kisit="az orta cok">
+    <td><span class="algo-name">Sentence-BERT</span><br><span style="color:var(--muted);font-size:0.62rem">Semantic Sentence Embedding</span></td>
+    <td><span class="tag tag-dl">derin öğrenme</span></td>
+    <td><span class="dot dot-good"></span>zero-shot</td><td><span class="dot dot-good"></span>iyi</td>
+    <td><span class="dot dot-bad"></span>kara kutu</td><td><span class="dot dot-ok"></span>orta</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+    <td><span class="dot dot-good"></span>evet</td><td><span class="dot dot-bad"></span>hayır</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+  </tr>
+
+  <tr data-veri="metin" data-gorev="metin-gomme" data-kisit="az orta cok">
+    <td><span class="algo-name">E5 / BGE</span><br><span style="color:var(--muted);font-size:0.62rem">Retrieval Embedding</span></td>
+    <td><span class="tag tag-dl">derin öğrenme</span></td>
+    <td><span class="dot dot-good"></span>zero-shot</td><td><span class="dot dot-good"></span>güçlü</td>
+    <td><span class="dot dot-bad"></span>kara kutu</td><td><span class="dot dot-ok"></span>orta</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+    <td><span class="dot dot-good"></span>retrieval</td><td><span class="dot dot-bad"></span>hayır</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+  </tr>
+
+  <tr data-veri="metin" data-gorev="metin-uretim" data-kisit="orta cok">
+    <td><span class="algo-name">LLaMA 3 / Mistral</span><br><span style="color:var(--muted);font-size:0.62rem">Decoder LLM</span></td>
+    <td><span class="tag tag-dl">derin öğrenme</span></td>
+    <td><span class="dot dot-ok"></span>few-shot</td><td><span class="dot dot-good"></span>en iyi</td>
+    <td><span class="dot dot-bad"></span>kara kutu</td><td><span class="dot dot-bad"></span>yavaş</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+    <td><span class="dot dot-good"></span>üretim</td><td><span class="dot dot-bad"></span>hayır</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+  </tr>
+
+  <tr data-veri="metin" data-gorev="metin-uretim metin-ceviri" data-kisit="orta cok">
+    <td><span class="algo-name">T5 / BART</span><br><span style="color:var(--muted);font-size:0.62rem">Encoder-Decoder</span></td>
+    <td><span class="tag tag-dl">derin öğrenme</span></td>
+    <td><span class="dot dot-ok"></span>fine-tune ile</td><td><span class="dot dot-good"></span>iyi</td>
+    <td><span class="dot dot-bad"></span>kara kutu</td><td><span class="dot dot-ok"></span>orta</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+    <td><span class="dot dot-good"></span>özetleme</td><td><span class="dot dot-bad"></span>hayır</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+  </tr>
+
+  <!-- ═══════════════ ZAMAN SERİSİ ═══════════════ -->
+  <tr class="section-row"><td colspan="12">// zaman serisi — tahmin</td></tr>
+
+  <tr data-veri="zaman" data-gorev="zaman-tahmin" data-kisit="az orta yorum kaynak">
+    <td><span class="algo-name">ARIMA / SARIMA</span><br><span style="color:var(--muted);font-size:0.62rem">Statistical Forecasting</span></td>
+    <td><span class="tag tag-klasik">klasik</span></td>
+    <td><span class="dot dot-good"></span>iyi</td><td><span class="dot dot-ok"></span>tamam</td>
+    <td><span class="dot dot-good"></span>tam</td><td><span class="dot dot-good"></span>hızlı</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-good"></span>evet</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+  </tr>
+
+  <tr data-veri="zaman" data-gorev="zaman-tahmin" data-kisit="az orta yorum kaynak">
+    <td><span class="algo-name">Prophet</span><br><span style="color:var(--muted);font-size:0.62rem">Additive Forecasting</span></td>
+    <td><span class="tag tag-klasik">klasik</span></td>
+    <td><span class="dot dot-good"></span>iyi</td><td><span class="dot dot-ok"></span>tamam</td>
+    <td><span class="dot dot-good"></span>bileşenler</td><td><span class="dot dot-good"></span>hızlı</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-good"></span>mevsimsel</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+  </tr>
+
+  <tr data-veri="zaman" data-gorev="zaman-tahmin" data-kisit="az orta cok yorum kaynak hiz">
+    <td><span class="algo-name">XGBoost + Lag</span><br><span style="color:var(--muted);font-size:0.62rem">Feature Engineering TS</span></td>
+    <td><span class="tag tag-ensemble">ensemble</span></td>
+    <td><span class="dot dot-ok"></span>lag mühendisliği</td><td><span class="dot dot-good"></span>çok iyi</td>
+    <td><span class="dot dot-ok"></span>SHAP ile</td><td><span class="dot dot-good"></span>hızlı</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-good"></span>evet</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+  </tr>
+
+  <tr data-veri="zaman" data-gorev="zaman-tahmin zaman-anomali" data-kisit="orta cok">
+    <td><span class="algo-name">LSTM</span><br><span style="color:var(--muted);font-size:0.62rem">Long Short-Term Memory</span></td>
+    <td><span class="tag tag-dl">derin öğrenme</span></td>
+    <td><span class="dot dot-bad"></span>yetersiz</td><td><span class="dot dot-good"></span>iyi</td>
+    <td><span class="dot dot-bad"></span>kara kutu</td><td><span class="dot dot-ok"></span>orta</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+    <td><span class="dot dot-ok"></span>kısmi</td><td><span class="dot dot-good"></span>evet</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+  </tr>
+
+  <tr data-veri="zaman" data-gorev="zaman-tahmin" data-kisit="orta cok">
+    <td><span class="algo-name">N-BEATS / N-HiTS</span><br><span style="color:var(--muted);font-size:0.62rem">Neural Basis Expansion</span></td>
+    <td><span class="tag tag-dl">derin öğrenme</span></td>
+    <td><span class="dot dot-bad"></span>yetersiz</td><td><span class="dot dot-good"></span>güçlü</td>
+    <td><span class="dot dot-ok"></span>bileşen ayrıştırma</td><td><span class="dot dot-ok"></span>orta</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-good"></span>evet</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+  </tr>
+
+  <tr data-veri="zaman" data-gorev="zaman-tahmin" data-kisit="orta cok">
+    <td><span class="algo-name">TFT</span><br><span style="color:var(--muted);font-size:0.62rem">Temporal Fusion Transformer</span></td>
+    <td><span class="tag tag-dl">derin öğrenme</span></td>
+    <td><span class="dot dot-bad"></span>yetersiz</td><td><span class="dot dot-good"></span>en iyi</td>
+    <td><span class="dot dot-ok"></span>attention ile</td><td><span class="dot dot-ok"></span>orta</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-good"></span>evet</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+  </tr>
+
+  <tr data-veri="zaman" data-gorev="zaman-tahmin" data-kisit="orta cok">
+    <td><span class="algo-name">PatchTST</span><br><span style="color:var(--muted);font-size:0.62rem">Patch-based Transformer</span></td>
+    <td><span class="tag tag-dl">derin öğrenme</span></td>
+    <td><span class="dot dot-bad"></span>yetersiz</td><td><span class="dot dot-good"></span>güçlü</td>
+    <td><span class="dot dot-bad"></span>kara kutu</td><td><span class="dot dot-ok"></span>orta</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-good"></span>evet</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+  </tr>
+
+  <tr data-veri="zaman" data-gorev="zaman-tahmin" data-kisit="orta cok">
+    <td><span class="algo-name">TCN</span><br><span style="color:var(--muted);font-size:0.62rem">Temporal Convolutional Network</span></td>
+    <td><span class="tag tag-dl">derin öğrenme</span></td>
+    <td><span class="dot dot-bad"></span>yetersiz</td><td><span class="dot dot-good"></span>iyi</td>
+    <td><span class="dot dot-bad"></span>kara kutu</td><td><span class="dot dot-good"></span>LSTM'den hızlı</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-good"></span>evet</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+  </tr>
+
+  <tr class="section-row"><td colspan="12">// zaman serisi — sınıf & anomali</td></tr>
+
+  <tr data-veri="zaman" data-gorev="zaman-sinif" data-kisit="az orta cok hiz kaynak">
+    <td><span class="algo-name">Rocket / MiniRocket</span><br><span style="color:var(--muted);font-size:0.62rem">Random Convolution TS</span></td>
+    <td><span class="tag tag-klasik">klasik</span></td>
+    <td><span class="dot dot-ok"></span>tamam</td><td><span class="dot dot-good"></span>SOTA hız</td>
+    <td><span class="dot dot-bad"></span>kara kutu</td><td><span class="dot dot-good"></span>çok hızlı</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-good"></span>evet</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+  </tr>
+
+  <tr data-veri="zaman" data-gorev="zaman-anomali" data-kisit="az orta cok yorum kaynak hiz">
+    <td><span class="algo-name">Isolation Forest + Lag</span><br><span style="color:var(--muted);font-size:0.62rem">TS Anomaly Detection</span></td>
+    <td><span class="tag tag-ensemble">ensemble</span></td>
+    <td><span class="dot dot-good"></span>iyi</td><td><span class="dot dot-good"></span>iyi</td>
+    <td><span class="dot dot-ok"></span>SHAP ile</td><td><span class="dot dot-good"></span>hızlı</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-good"></span>evet</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+  </tr>
+
+  <!-- ═══════════════ GRAF ═══════════════ -->
+  <tr class="section-row"><td colspan="12">// graf — gnn</td></tr>
+
+  <tr data-veri="graf" data-gorev="graf-sinif graf-gomme" data-kisit="az orta cok kaynak">
+    <td><span class="algo-name">Node2Vec</span><br><span style="color:var(--muted);font-size:0.62rem">Random Walk Embedding</span></td>
+    <td><span class="tag tag-klasik">klasik</span></td>
+    <td><span class="dot dot-good"></span>iyi</td><td><span class="dot dot-good"></span>iyi</td>
+    <td><span class="dot dot-ok"></span>kısmi</td><td><span class="dot dot-good"></span>hızlı</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+    <td><span class="dot dot-good"></span>evet</td><td><span class="dot dot-bad"></span>hayır</td>
+  </tr>
+
+  <tr data-veri="graf" data-gorev="graf-sinif graf-gomme" data-kisit="orta cok">
+    <td><span class="algo-name">GCN / GAT</span><br><span style="color:var(--muted);font-size:0.62rem">Graph Neural Network</span></td>
+    <td><span class="tag tag-dl">derin öğrenme</span></td>
+    <td><span class="dot dot-ok"></span>kısmi</td><td><span class="dot dot-good"></span>iyi</td>
+    <td><span class="dot dot-bad"></span>kara kutu</td><td><span class="dot dot-ok"></span>orta</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+    <td><span class="dot dot-good"></span>evet</td><td><span class="dot dot-bad"></span>hayır</td>
+  </tr>
+
+  <tr data-veri="graf" data-gorev="graf-sinif graf-gomme" data-kisit="orta cok hiz">
+    <td><span class="algo-name">GraphSAGE</span><br><span style="color:var(--muted);font-size:0.62rem">Inductive GNN</span></td>
+    <td><span class="tag tag-dl">derin öğrenme</span></td>
+    <td><span class="dot dot-ok"></span>kısmi</td><td><span class="dot dot-good"></span>büyük graf</td>
+    <td><span class="dot dot-bad"></span>kara kutu</td><td><span class="dot dot-good"></span>hızlı</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+    <td><span class="dot dot-good"></span>evet</td><td><span class="dot dot-bad"></span>hayır</td>
+  </tr>
+
+  <tr data-veri="graf" data-gorev="graf-kumeleme" data-kisit="az orta cok yorum kaynak hiz">
+    <td><span class="algo-name">Louvain</span><br><span style="color:var(--muted);font-size:0.62rem">Community Detection</span></td>
+    <td><span class="tag tag-klasik">klasik</span></td>
+    <td><span class="dot dot-good"></span>iyi</td><td><span class="dot dot-good"></span>ölçeklenir</td>
+    <td><span class="dot dot-good"></span>modularity</td><td><span class="dot dot-good"></span>hızlı</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+    <td><span class="dot dot-good"></span>evet</td><td><span class="dot dot-bad"></span>hayır</td>
+  </tr>
+
+  <!-- ═══════════════ SES ═══════════════ -->
+  <tr class="section-row"><td colspan="12">// ses / sinyal</td></tr>
+
+  <tr data-veri="ses" data-gorev="ses-sinif" data-kisit="az orta yorum kaynak hiz">
+    <td><span class="algo-name">SVM + MFCC</span><br><span style="color:var(--muted);font-size:0.62rem">Feature + Classifier</span></td>
+    <td><span class="tag tag-klasik">klasik</span></td>
+    <td><span class="dot dot-good"></span>iyi</td><td><span class="dot dot-ok"></span>tamam</td>
+    <td><span class="dot dot-ok"></span>kısmi</td><td><span class="dot dot-good"></span>hızlı</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-good"></span>evet</td>
+  </tr>
+
+  <tr data-veri="ses" data-gorev="ses-sinif ses-gomme" data-kisit="orta cok">
+    <td><span class="algo-name">YAMNet</span><br><span style="color:var(--muted);font-size:0.62rem">Yet Another Mobile Net Audio</span></td>
+    <td><span class="tag tag-dl">derin öğrenme</span></td>
+    <td><span class="dot dot-ok"></span>fine-tune ile</td><td><span class="dot dot-good"></span>iyi</td>
+    <td><span class="dot dot-bad"></span>kara kutu</td><td><span class="dot dot-good"></span>hızlı</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-good"></span>evet</td>
+  </tr>
+
+  <tr data-veri="ses" data-gorev="ses-sinif ses-gomme" data-kisit="orta cok">
+    <td><span class="algo-name">AST</span><br><span style="color:var(--muted);font-size:0.62rem">Audio Spectrogram Transformer</span></td>
+    <td><span class="tag tag-dl">derin öğrenme</span></td>
+    <td><span class="dot dot-bad"></span>yetersiz</td><td><span class="dot dot-good"></span>SOTA ses sınıf.</td>
+    <td><span class="dot dot-bad"></span>kara kutu</td><td><span class="dot dot-ok"></span>orta</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-good"></span>evet</td>
+  </tr>
+
+  <tr data-veri="ses" data-gorev="ses-sinif ses-gomme" data-kisit="orta cok">
+    <td><span class="algo-name">wav2vec 2.0 / HuBERT</span><br><span style="color:var(--muted);font-size:0.62rem">Self-supervised Audio</span></td>
+    <td><span class="tag tag-dl">derin öğrenme</span></td>
+    <td><span class="dot dot-ok"></span>fine-tune ile</td><td><span class="dot dot-good"></span>en iyi</td>
+    <td><span class="dot dot-bad"></span>kara kutu</td><td><span class="dot dot-ok"></span>orta</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-good"></span>zaman ile</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-good"></span>evet</td>
+  </tr>
+
+  <tr data-veri="ses" data-gorev="ses-asr" data-kisit="az orta cok hiz">
+    <td><span class="algo-name">Whisper</span><br><span style="color:var(--muted);font-size:0.62rem">ASR Transformer</span></td>
+    <td><span class="tag tag-dl">derin öğrenme</span></td>
+    <td><span class="dot dot-good"></span>zero-shot</td><td><span class="dot dot-good"></span>iyi</td>
+    <td><span class="dot dot-bad"></span>kara kutu</td><td><span class="dot dot-ok"></span>orta</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+    <td><span class="dot dot-good"></span>transkript</td><td><span class="dot dot-bad"></span>hayır</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-good"></span>evet</td>
+  </tr>
+
+  <tr data-veri="ses" data-gorev="ses-uretim" data-kisit="az orta cok">
+    <td><span class="algo-name">VITS</span><br><span style="color:var(--muted);font-size:0.62rem">End-to-end TTS</span></td>
+    <td><span class="tag tag-dl">derin öğrenme</span></td>
+    <td><span class="dot dot-ok"></span>az ses ile</td><td><span class="dot dot-good"></span>en iyi TTS</td>
+    <td><span class="dot dot-bad"></span>kara kutu</td><td><span class="dot dot-ok"></span>orta</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-bad"></span>hayır</td>
+    <td><span class="dot dot-bad"></span>hayır</td><td><span class="dot dot-good"></span>evet</td>
+  </tr>
+
+  </tbody>
+</table>
+</div>
+
+<div class="legend">
+  <div class="legend-item"><span class="dot dot-good"></span>iyi / uygun</div>
+  <div class="legend-item"><span class="dot dot-ok"></span>kullanılabilir / dikkatli ol</div>
+  <div class="legend-item"><span class="dot dot-bad"></span>uygun değil</div>
+</div>
+
+<script>
+const R = {
+  // ── TABLO × SINIF ──
+  "tablo-sinif-az":      ["Lojistik Regresyon veya Random Forest","Az veri + tablo + sınıflandırma → önce LR baseline kur. Daha fazla güç gerekirse RF. XGBoost az veride aşırı öğrenebilir."],
+  "tablo-sinif-orta":    ["LightGBM","Orta veri + tablo → LightGBM neredeyse her zaman güçlü baseline. Hızlı, SHAP ile yorumlanabilir, kategorik destekli."],
+  "tablo-sinif-cok":     ["XGBoost veya LightGBM","Çok veri + tablo → boosting ailesi. XGBoost doğruluk, LightGBM hız için. FT-Transformer da dene."],
+  "tablo-sinif-yorum":   ["Lojistik Regresyon veya Karar Ağacı","Yorumlanabilirlik zorunlu → LR katsayı yorumu, DT kural yorumu. RF + SHAP orta yol."],
+  "tablo-sinif-hiz":     ["LightGBM","Hız + tablo sınıf → LightGBM inference milisaniye. LR daha da hızlı ama performans düşer."],
+  "tablo-sinif-kaynak":  ["LightGBM veya Lojistik Regresyon","CPU + tablo → LightGBM veya LR. GPU gerektirmez."],
+  // ── TABLO × REGRESYON ──
+  "tablo-regresyon-az":   ["Ridge veya Lasso","Az veri + regresyon → düzenlileştirmeli lineer model. Lasso özellik seçimi de yapar."],
+  "tablo-regresyon-orta": ["XGBoost Regressor","Orta veri + regresyon → XGBoost Regressor güçlü baseline."],
+  "tablo-regresyon-cok":  ["LightGBM veya XGBoost","Çok veri + regresyon → boosting ailesi. SHAP ile etki analizi yap."],
+  "tablo-regresyon-yorum":["Ridge veya Lasso","Yorumlanabilir regresyon → Ridge/Lasso katsayıları doğrudan yorumlanabilir."],
+  "tablo-regresyon-hiz":  ["LightGBM","Hız + regresyon → LightGBM inference çok hızlı."],
+  "tablo-regresyon-kaynak":["Ridge veya LightGBM","CPU + regresyon → Ridge veya LightGBM. GPU gerekmez."],
+  // ── TABLO × KÜMELEME ──
+  "tablo-kumeleme-az":    ["K-Means","Az veri + kümeleme → K-Means. Elbow yöntemi ile küme sayısı belirle."],
+  "tablo-kumeleme-orta":  ["K-Means veya HDBSCAN","Orta veri → K-Means küme sayısı belirli ise, HDBSCAN gürültü varsa."],
+  "tablo-kumeleme-cok":   ["Mini-Batch K-Means veya GMM","Çok veri + kümeleme → Mini-Batch K-Means hız için, GMM olasılıksal üyelik için."],
+  "tablo-kumeleme-yorum": ["K-Means veya GMM","Yorumlanabilir kümeleme → K-Means centroid yorumu açık, GMM olasılıksal üyelik verir."],
+  "tablo-kumeleme-hiz":   ["Mini-Batch K-Means","Hız + kümeleme → Mini-Batch K-Means."],
+  "tablo-kumeleme-kaynak":["K-Means","CPU + kümeleme → K-Means sklearn ile verimli."],
+  // ── TABLO × ANOMALİ ──
+  "tablo-anomali-az":     ["Isolation Forest","Az veri + anomali → IF etiketsiz çalışır, az veride dayanıklı."],
+  "tablo-anomali-orta":   ["Isolation Forest veya LOF","Orta veri → IF genel amaçlı, LOF yerel yoğunluk anomalileri için."],
+  "tablo-anomali-cok":    ["Isolation Forest veya Autoencoder","Çok veri → IF hızlı, karmaşık anomaliler için Autoencoder."],
+  "tablo-anomali-yorum":  ["Isolation Forest + SHAP","Yorumlanabilir anomali → SHAP ile hangi özelliğin anomaliyi tetiklediğini gör."],
+  "tablo-anomali-hiz":    ["Isolation Forest","Hız + anomali → IF inference çok hızlı."],
+  "tablo-anomali-kaynak": ["Isolation Forest","CPU + anomali → IF sklearn, GPU gerekmez."],
+  // ── TABLO × BOYUT ──
+  "tablo-boyut-az":       ["PCA","Az veri + boyut → PCA. Basit, hızlı, lineer."],
+  "tablo-boyut-orta":     ["PCA veya UMAP","Orta veri → ön işlem için PCA, görselleştirme için UMAP."],
+  "tablo-boyut-cok":      ["UMAP","Çok veri + boyut → UMAP nonlineer yapıyı korur, t-SNE'den hızlı ölçeklenir."],
+  "tablo-boyut-yorum":    ["PCA veya ICA","Yorumlanabilir boyut → PCA bileşen katkıları açık, ICA bağımsız kaynak ayrıştırır."],
+  "tablo-boyut-hiz":      ["PCA","Hız + boyut → PCA en hızlı."],
+  "tablo-boyut-kaynak":   ["PCA","CPU + boyut → PCA sklearn ile verimli."],
+  // ── TABLO × GÖMME ──
+  "tablo-gomme-az":       ["PCA","Az veri + tablo gömme → PCA lineer baseline."],
+  "tablo-gomme-orta":     ["Autoencoder","Orta veri + gömme → Autoencoder nonlineer temsil öğrenir."],
+  "tablo-gomme-cok":      ["Autoencoder veya VAE","Çok veri + gömme → VAE olasılıksal latent space."],
+  "tablo-gomme-yorum":    ["PCA","Yorumlanabilir gömme → PCA bileşenleri doğrudan yorumlanabilir."],
+  "tablo-gomme-hiz":      ["PCA","Hız + gömme → PCA."],
+  "tablo-gomme-kaynak":   ["PCA","CPU + gömme → PCA."],
+  // ── TABLO × ÜRETİM ──
+  "tablo-uretim-az":      ["⚠ CTGAN (dikkatli ol)","Az veri + sentetik tablo → CTGAN dene ama kalite düşük olur. Sonuçları istatistiksel olarak orijinalle karşılaştır."],
+  "tablo-uretim-orta":    ["CTGAN","Orta veri + sentetik tablo → CTGAN kategorik sütunlarda başarılı."],
+  "tablo-uretim-cok":     ["CTGAN veya TVAE","Çok veri + sentetik tablo → CTGAN veya TVAE. GReaT (LLM tabanlı) deneysel ama güçlü."],
+  "tablo-uretim-yorum":   ["TVAE","Yorumlanabilir sentetik tablo → TVAE latent space daha şeffaf."],
+  "tablo-uretim-hiz":     ["TVAE","Hız + sentetik tablo → TVAE CTGAN'dan hızlı eğitilir."],
+  "tablo-uretim-kaynak":  ["TVAE","CPU + sentetik tablo → TVAE daha az kaynak ister."],
+  // ── GÖRÜNTÜ × SINIF ──
+  "goruntu-goruntu-sinif-az":     ["EfficientNet Transfer Learning","Az veri + görüntü sınıf → TL zorunlu. EfficientNet son katmanlarını fine-tune et. Sıfırdan CNN kurma."],
+  "goruntu-goruntu-sinif-orta":   ["ResNet veya EfficientNet (fine-tune)","Orta veri + görüntü → pretrained CNN fine-tune. Son bloğu aç, erken katmanları dondur."],
+  "goruntu-goruntu-sinif-cok":    ["ViT veya ConvNeXt","Çok veri + görüntü → ViT global attention ile en güçlü. ConvNeXt CNN tercih ediliyorsa."],
+  "goruntu-goruntu-sinif-yorum":  ["EfficientNet + GradCAM","Yorumlanabilirlik + görüntü → GradCAM ile hangi bölge kararı etkiliyor görselleştir."],
+  "goruntu-goruntu-sinif-hiz":    ["MobileNetV3","Gerçek zamanlı görüntü sınıf → MobileNetV3. Edge için TFLite'a dönüştür."],
+  "goruntu-goruntu-sinif-kaynak": ["MobileNetV3","CPU + görüntü sınıf → MobileNetV3 hafif mimari."],
+  // ── GÖRÜNTÜ × TESPİT ──
+  "goruntu-goruntu-tespit-az":    ["YOLOv8 (TL)","Az veri + nesne tespiti → YOLO pretrained fine-tune."],
+  "goruntu-goruntu-tespit-orta":  ["YOLOv8","Orta veri + nesne tespiti → YOLOv8 hız/doğruluk dengesi en iyi."],
+  "goruntu-goruntu-tespit-cok":   ["YOLOv8 veya DETR","Çok veri + nesne tespiti → DETR transformer tabanlı daha güçlü, YOLO daha hızlı."],
+  "goruntu-goruntu-tespit-yorum": ["Faster R-CNN + GradCAM","Yorumlanabilir nesne tespiti → R-CNN bölge önerileri incelenebilir."],
+  "goruntu-goruntu-tespit-hiz":   ["YOLOv8","Gerçek zamanlı tespit → YOLOv8."],
+  "goruntu-goruntu-tespit-kaynak":["YOLOv8n (nano)","CPU + tespit → YOLOv8 nano modeli CPU'da çalışır."],
+  // ── GÖRÜNTÜ × SEGM ──
+  "goruntu-goruntu-segm-az":      ["SAM (zero-shot)","Az veri + segmentasyon → SAM zero-shot çalışır, etiket gerekmez."],
+  "goruntu-goruntu-segm-orta":    ["U-Net","Orta veri + segmentasyon → U-Net medikal/endüstriyel için standart."],
+  "goruntu-goruntu-segm-cok":     ["SAM veya Mask R-CNN","Çok veri + segmentasyon → SAM en güçlü genel, Mask R-CNN instance segm. için."],
+  "goruntu-goruntu-segm-yorum":   ["U-Net + aktivasyon haritası","Yorumlanabilir segm. → U-Net ara katman aktivasyonları görselleştirilebilir."],
+  "goruntu-goruntu-segm-hiz":     ["YOLOv8 (segm. modu)","Hız + segmentasyon → YOLO segmentation modu gerçek zamanlı."],
+  "goruntu-goruntu-segm-kaynak":  ["U-Net (hafif)","CPU + segmentasyon → hafif U-Net. Büyük modeller GPU ister."],
+  // ── GÖRÜNTÜ × GÖMME ──
+  "goruntu-goruntu-gomme-az":     ["CLIP","Az veri + görüntü gömme → CLIP zero-shot. Etiket gerekmez."],
+  "goruntu-goruntu-gomme-orta":   ["CLIP veya DINOv2","Orta veri → CLIP metin-görüntü, DINOv2 görüntü-görüntü benzerlik."],
+  "goruntu-goruntu-gomme-cok":    ["DINOv2 veya fine-tuned CLIP","Çok veri → domain fine-tune kaliteyi artırır."],
+  "goruntu-goruntu-gomme-yorum":  ["CNN özellik katmanı","Yorumlanabilir görüntü gömme → ara katman aktivasyonları incelenebilir."],
+  "goruntu-goruntu-gomme-hiz":    ["CLIP ViT-B/32","Hız + görüntü gömme → CLIP ViT-B/32 en hafif."],
+  "goruntu-goruntu-gomme-kaynak": ["MobileNet özellik vektörü","CPU + görüntü gömme → MobileNet intermediate layer."],
+  // ── GÖRÜNTÜ × ÜRETİM ──
+  "goruntu-goruntu-uretim-az":    ["DreamBooth / LoRA","Az veri + görüntü üretimi → SD üzerine DreamBooth ile 10-20 görüntüyle fine-tune."],
+  "goruntu-goruntu-uretim-orta":  ["Stable Diffusion fine-tune","Orta veri + görüntü üretimi → SD LoRA fine-tune."],
+  "goruntu-goruntu-uretim-cok":   ["Stable Diffusion veya GAN","Çok veri + görüntü üretimi → SD en güçlü, GAN hız için."],
+  "goruntu-goruntu-uretim-yorum": ["VAE","Yorumlanabilir üretim → VAE latent interpolasyonu anlamlı."],
+  "goruntu-goruntu-uretim-hiz":   ["GAN (inference)","Hız + üretim → GAN inference hızlı, SD distilled versiyonlar (LCM)."],
+  "goruntu-goruntu-uretim-kaynak":["⚠ GPU gerekli","CPU + görüntü üretimi pratik değil. Min 8GB VRAM önerilir."],
+  // ── GÖRÜNTÜ × ANOMALİ ──
+  "goruntu-goruntu-anomali-az":   ["PatchCore","Az veri + görüntü anomali → PatchCore few-shot anomali için güçlü."],
+  "goruntu-goruntu-anomali-orta": ["PatchCore veya CNN Autoencoder","Orta veri → PatchCore endüstriyel kusur tespitinde SOTA."],
+  "goruntu-goruntu-anomali-cok":  ["CNN Autoencoder veya EfficientAD","Çok veri → reconstruction error ile anomali tespiti."],
+  "goruntu-goruntu-anomali-yorum":["CNN Autoencoder","Yorumlanabilir → reconstruction farkı görselleştirilebilir."],
+  "goruntu-goruntu-anomali-hiz":  ["EfficientAD","Hız + görüntü anomali → EfficientAD gerçek zamanlı."],
+  "goruntu-goruntu-anomali-kaynak":["EfficientNet özellik + IF","CPU + görüntü anomali → pretrained CNN özellik + IF."],
+  // ── METİN × SINIF ──
+  "metin-metin-sinif-az":     ["TF-IDF + Lojistik Regresyon","Az veri + metin sınıf → TF-IDF+LR baseline. Sonra DistilBERT fine-tune dene."],
+  "metin-metin-sinif-orta":   ["BERT / RoBERTa (fine-tune)","Orta veri + metin → BERT fine-tune. Türkçe için BERTurk kullan."],
+  "metin-metin-sinif-cok":    ["DeBERTa-v3","Çok veri + metin sınıf → DeBERTa-v3 SOTA. RoBERTa hız/doğruluk dengesi."],
+  "metin-metin-sinif-yorum":  ["TF-IDF + LR","Yorumlanabilir metin sınıf → TF-IDF katsayıları kelime önemini gösterir."],
+  "metin-metin-sinif-hiz":    ["DistilBERT veya FastText","Hız + metin sınıf → DistilBERT veya FastText."],
+  "metin-metin-sinif-kaynak": ["TF-IDF + LR","CPU + metin sınıf → TF-IDF+LR en hafif."],
+  // ── METİN × ÜRETİM ──
+  "metin-metin-uretim-az":    ["Few-shot LLM","Az veri + metin üretimi → büyük LLM'e few-shot örnek ver, fine-tune gerekmez."],
+  "metin-metin-uretim-orta":  ["Gemma 2B veya LLaMA (QLoRA)","Orta veri + metin üretimi → küçük LLM QLoRA fine-tune. Gemma 2B başlangıç için dengeli."],
+  "metin-metin-uretim-cok":   ["LLaMA 3 veya Mistral fine-tune","Çok veri + metin üretimi → LLaMA 3 8B veya Mistral 7B."],
+  "metin-metin-uretim-yorum": ["T5 (Seq2Seq)","Yorumlanabilir metin üretimi → T5 attention görselleştirilebilir."],
+  "metin-metin-uretim-hiz":   ["TinyLlama veya quantized Mistral","Hız + metin üretimi → quantized model veya TinyLlama."],
+  "metin-metin-uretim-kaynak":["TinyLlama veya GPT-2","CPU + metin üretimi → TinyLlama 1.1B. llama.cpp ile CPU inference mümkün."],
+  // ── METİN × GÖMME ──
+  "metin-metin-gomme-az":     ["Sentence-BERT","Az veri + metin gömme → S-BERT zero-shot benzerlik. Fine-tune gerekmez."],
+  "metin-metin-gomme-orta":   ["Sentence-BERT veya E5","Orta veri + metin gömme → S-BERT veya E5 multilingual."],
+  "metin-metin-gomme-cok":    ["E5 veya domain fine-tuned BERT","Çok veri + metin gömme → domain fine-tune embedding kalitesini artırır."],
+  "metin-metin-gomme-yorum":  ["Word2Vec veya FastText","Yorumlanabilir metin gömme → Word2Vec analogiler ve komşular yorumlanabilir."],
+  "metin-metin-gomme-hiz":    ["FastText","Hız + metin gömme → FastText inference çok hızlı."],
+  "metin-metin-gomme-kaynak": ["FastText","CPU + metin gömme → FastText."],
+  // ── METİN × ÇEVİRİ ──
+  "metin-metin-ceviri-az":    ["T5 veya mBART (few-shot)","Az veri + çeviri → pretrained T5/mBART, fine-tune gerekmeyebilir."],
+  "metin-metin-ceviri-orta":  ["mBART veya NLLB fine-tune","Orta veri + çeviri → mBART çok dilli, NLLB 200 dil desteği."],
+  "metin-metin-ceviri-cok":   ["NLLB veya OPUS-MT","Çok veri + çeviri → NLLB Meta'nın güçlü modeli."],
+  "metin-metin-ceviri-yorum": ["T5","Yorumlanabilir çeviri → T5 encoder-decoder attention görselleştirilebilir."],
+  "metin-metin-ceviri-hiz":   ["OPUS-MT","Hız + çeviri → OPUS-MT hafif ve hızlı."],
+  "metin-metin-ceviri-kaynak":["OPUS-MT","CPU + çeviri → OPUS-MT hafif."],
+  // ── METİN × NER ──
+  "metin-metin-ner-az":       ["BERT + CRF","Az veri + NER → BERT+CRF few-shot için güçlü."],
+  "metin-metin-ner-orta":     ["BERT fine-tune (token sınıf.)","Orta veri + NER → BERT token classification. Türkçe için BERTurk."],
+  "metin-metin-ner-cok":      ["DeBERTa token sınıflandırma","Çok veri + NER → DeBERTa güçlü."],
+  "metin-metin-ner-yorum":    ["CRF","Yorumlanabilir NER → CRF geçiş olasılıkları yorumlanabilir."],
+  "metin-metin-ner-hiz":      ["DistilBERT token sınıf.","Hız + NER → DistilBERT."],
+  "metin-metin-ner-kaynak":   ["spaCy","CPU + NER → spaCy CPU optimize."],
+  // ── ZAMAN × TAHMİN ──
+  "zaman-zaman-tahmin-az":    ["ARIMA veya Prophet","Az veri + tahmin → ARIMA yorumlanabilir, Prophet mevsimsellik için."],
+  "zaman-zaman-tahmin-orta":  ["XGBoost + Lag","Orta veri + tahmin → XGBoost lag/rolling/mevsimsel özelliklerle güçlü baseline."],
+  "zaman-zaman-tahmin-cok":   ["TFT veya PatchTST","Çok veri + uzun vadeli tahmin → TFT en güçlü çok değişkenlide, PatchTST transformer tabanlı."],
+  "zaman-zaman-tahmin-yorum": ["ARIMA veya Prophet","Yorumlanabilir tahmin → ARIMA katsayıları, Prophet trend+mevsimsellik ayrıştırması."],
+  "zaman-zaman-tahmin-hiz":   ["XGBoost + Lag","Hız + tahmin → XGBoost inference çok hızlı."],
+  "zaman-zaman-tahmin-kaynak":["ARIMA veya XGBoost","CPU + tahmin → ARIMA veya XGBoost. LSTM/TFT GPU ister."],
+  // ── ZAMAN × SINIF ──
+  "zaman-zaman-sinif-az":     ["TSFresh + Random Forest","Az veri + zaman serisi sınıf → TSFresh istatistiksel özellik çıkar, RF ile sınıflandır."],
+  "zaman-zaman-sinif-orta":   ["Rocket / MiniRocket","Orta veri + zaman sınıf → Rocket hız ve doğrulukta SOTA."],
+  "zaman-zaman-sinif-cok":    ["InceptionTime veya PatchTST","Çok veri + zaman sınıf → InceptionTime CNN tabanlı güvenilir, PatchTST daha güçlü."],
+  "zaman-zaman-sinif-yorum":  ["TSFresh + RF + SHAP","Yorumlanabilir zaman sınıf → TSFresh özellikler anlamlı, SHAP ile önem sırala."],
+  "zaman-zaman-sinif-hiz":    ["Rocket","Hız + zaman sınıf → Rocket/MiniRocket en hızlı."],
+  "zaman-zaman-sinif-kaynak": ["Rocket veya TSFresh+LR","CPU + zaman sınıf → Rocket CPU'da verimli."],
+  // ── ZAMAN × ANOMALİ ──
+  "zaman-zaman-anomali-az":   ["STL + threshold","Az veri + zaman anomali → STL bileşen ayrıştır, artık üzerinde threshold."],
+  "zaman-zaman-anomali-orta": ["Isolation Forest + Lag","Orta veri + zaman anomali → IF lag özellikleriyle hızlı ve güvenilir."],
+  "zaman-zaman-anomali-cok":  ["LSTM Autoencoder","Çok veri + zaman anomali → LSTM-AE zamansal bağımlılığı yakalar."],
+  "zaman-zaman-anomali-yorum":["STL + threshold","Yorumlanabilir zaman anomali → STL artığı doğrudan yorumlanır."],
+  "zaman-zaman-anomali-hiz":  ["Isolation Forest + Lag","Hız + zaman anomali → IF inference çok hızlı."],
+  "zaman-zaman-anomali-kaynak":["STL veya IF","CPU + zaman anomali → STL veya IF."],
+  // ── ZAMAN × KÜMELEME ──
+  "zaman-zaman-kumeleme-az":  ["DTW + K-Means","Az veri + zaman kümeleme → DTW mesafesi ile K-Means."],
+  "zaman-zaman-kumeleme-orta":["k-Shape","Orta veri + zaman kümeleme → k-Shape şekil tabanlı kümeleme."],
+  "zaman-zaman-kumeleme-cok": ["TSFresh + K-Means","Çok veri + zaman kümeleme → TSFresh özellik çıkar, K-Means. DTW büyük veride yavaş."],
+  "zaman-zaman-kumeleme-yorum":["DTW + K-Means","Yorumlanabilir → her kümenin medoid serisi görselleştirilebilir."],
+  "zaman-zaman-kumeleme-hiz": ["TSFresh + Mini-Batch K-Means","Hız + zaman kümeleme → TSFresh+Mini-Batch K-Means."],
+  "zaman-zaman-kumeleme-kaynak":["TSFresh + K-Means","CPU + zaman kümeleme → DTW yavaş, TSFresh+K-Means tercih et."],
+  // ── GRAF × SINIF ──
+  "graf-graf-sinif-az":    ["Node2Vec + RF","Az veri + graf sınıf → Node2Vec embedding + RF. GNN az veride aşırı öğrenir."],
+  "graf-graf-sinif-orta":  ["GCN veya GAT","Orta veri + graf sınıf → GCN basit, GAT attention ile komşu ağırlığı öğrenir."],
+  "graf-graf-sinif-cok":   ["GAT veya GraphSAGE","Çok veri + graf sınıf → GAT transductive, GraphSAGE inductive büyük graf için."],
+  "graf-graf-sinif-yorum": ["Node2Vec + RF + SHAP","Yorumlanabilir → Node2Vec + SHAP hangi yapısal özellik önemli gösterir."],
+  "graf-graf-sinif-hiz":   ["GraphSAGE","Hız + graf sınıf → GraphSAGE mini-batch, büyük graflarda ölçeklenir."],
+  "graf-graf-sinif-kaynak":["Node2Vec + LR","CPU + graf sınıf → Node2Vec CPU'da çalışır. GNN GPU tercihli."],
+  // ── GRAF × GÖMME ──
+  "graf-graf-gomme-az":    ["Node2Vec","Az veri + graf gömme → Node2Vec random walk ile öğrenir, GNN gerekmez."],
+  "graf-graf-gomme-orta":  ["Node2Vec veya GCN encoder","Orta veri → Node2Vec hız için, GCN kalite için."],
+  "graf-graf-gomme-cok":   ["GraphSAGE veya DGI","Çok veri → DGI self-supervised, GraphSAGE inductive öğrenme."],
+  "graf-graf-gomme-yorum": ["Node2Vec","Yorumlanabilir → benzer düğümler yakın uzayda, komşuluk incelenebilir."],
+  "graf-graf-gomme-hiz":   ["Node2Vec","Hız + graf gömme → Node2Vec hızlı."],
+  "graf-graf-gomme-kaynak":["Node2Vec","CPU + graf gömme → Node2Vec CPU dostu."],
+  // ── GRAF × KÜMELEME ──
+  "graf-graf-kumeleme-az":    ["Louvain","Az veri + graf kümeleme → Louvain topluluk tespiti."],
+  "graf-graf-kumeleme-orta":  ["Louvain veya Node2Vec + K-Means","Orta veri → Louvain direkt grafta, Node2Vec+K-Means embedding uzayında."],
+  "graf-graf-kumeleme-cok":   ["Louvain","Çok veri + graf kümeleme → Louvain büyük graflara ölçeklenir."],
+  "graf-graf-kumeleme-yorum": ["Louvain","Yorumlanabilir → modularity skoru ile küme kalitesi ölçülür."],
+  "graf-graf-kumeleme-hiz":   ["Louvain","Hız + graf kümeleme → Louvain çok hızlı."],
+  "graf-graf-kumeleme-kaynak":["Louvain","CPU + graf kümeleme → networkx veya igraph ile verimli."],
+  // ── GRAF × ANOMALİ ──
+  "graf-graf-anomali-az":    ["Yapısal özellik + IF","Az veri + graf anomali → derece/betweenness gibi yapısal özellik + IF."],
+  "graf-graf-anomali-orta":  ["VGAE","Orta veri + graf anomali → VGAE reconstruction error yüksek düğümler anomali."],
+  "graf-graf-anomali-cok":   ["DOMINANT veya VGAE","Çok veri + graf anomali → DOMINANT GNN tabanlı anomali için özel."],
+  "graf-graf-anomali-yorum": ["Yapısal özellik + IF + SHAP","Yorumlanabilir → SHAP hangi yapısal özelliğin anomaliyi tetiklediğini gösterir."],
+  "graf-graf-anomali-hiz":   ["Yapısal özellik + IF","Hız + graf anomali → yapısal özellik+IF hızlı."],
+  "graf-graf-anomali-kaynak":["Yapısal özellik + IF","CPU + graf anomali → GNN GPU ister, IF CPU dostu."],
+  // ── SES × SINIF ──
+  "ses-ses-sinif-az":     ["SVM + MFCC","Az veri + ses sınıf → MFCC özellik çıkar, SVM ile sınıflandır."],
+  "ses-ses-sinif-orta":   ["CNN + Mel Spectrogram veya YAMNet","Orta veri + ses → Mel spektrogram CNN ile, YAMNet pretrained fine-tune."],
+  "ses-ses-sinif-cok":    ["wav2vec 2.0 veya HuBERT","Çok veri + ses → self-supervised pretrained model fine-tune. En güçlü seçenek."],
+  "ses-ses-sinif-yorum":  ["SVM + MFCC + SHAP","Yorumlanabilir ses → MFCC fiziksel anlam taşır, SHAP ile frekans önemi."],
+  "ses-ses-sinif-hiz":    ["CNN + MFCC","Hız + ses sınıf → CNN+MFCC inference hızlı."],
+  "ses-ses-sinif-kaynak": ["SVM + MFCC","CPU + ses sınıf → SVM+MFCC GPU gerekmez."],
+  // ── SES × ÜRETİM ──
+  "ses-ses-uretim-az":    ["VITS (az veri fine-tune)","Az veri + ses üretimi → VITS az sesle iyi kalite. YourTTS few-shot voice cloning."],
+  "ses-ses-uretim-orta":  ["VITS","Orta veri + ses üretimi → VITS end-to-end güçlü."],
+  "ses-ses-uretim-cok":   ["VITS veya Diffusion TTS","Çok veri + ses üretimi → Diffusion TTS en kaliteli."],
+  "ses-ses-uretim-yorum": ["⚠ TTS doğası gereği kara kutu","Yorumlanabilir TTS zor. Spektral analiz ile çıktı kontrol edilebilir."],
+  "ses-ses-uretim-hiz":   ["VITS (streaming)","Hız + ses üretimi → VITS streaming modu."],
+  "ses-ses-uretim-kaynak":["⚠ GPU önerilir","CPU + TTS kalitesi düşük. espeak klasik ama robotik."],
+  // ── SES × GÖMME ──
+  "ses-ses-gomme-az":     ["MFCC vektörü veya VGGish","Az veri + ses gömme → MFCC sabit temsil, VGGish pretrained zero-shot."],
+  "ses-ses-gomme-orta":   ["wav2vec 2.0 (frozen)","Orta veri + ses gömme → pretrained wav2vec frozen embedding çıkar."],
+  "ses-ses-gomme-cok":    ["wav2vec fine-tune veya CLAP","Çok veri + ses gömme → CLAP ses-metin ortak uzay."],
+  "ses-ses-gomme-yorum":  ["MFCC vektörü","Yorumlanabilir ses gömme → MFCC her boyutu anlamlı frekans bilgisi."],
+  "ses-ses-gomme-hiz":    ["MFCC","Hız + ses gömme → MFCC çok hızlı."],
+  "ses-ses-gomme-kaynak": ["MFCC","CPU + ses gömme → MFCC CPU dostu, librosa ile kolayca."],
+  // ── SES × ASR ──
+  "ses-ses-asr-az":     ["Whisper (zero-shot)","Az veri + ASR → Whisper zero-shot çalışır, fine-tune gerekmez."],
+  "ses-ses-asr-orta":   ["Whisper fine-tune","Orta veri + ASR → Whisper domain fine-tune."],
+  "ses-ses-asr-cok":    ["wav2vec 2.0 fine-tune","Çok veri + ASR → wav2vec full fine-tune en güçlü."],
+  "ses-ses-asr-yorum":  ["Whisper","Yorumlanabilir ASR → transkript + timestamp çıktısı incelenebilir."],
+  "ses-ses-asr-hiz":    ["Whisper (small/base)","Hız + ASR → Whisper small veya base modeli."],
+  "ses-ses-asr-kaynak": ["Whisper (tiny)","CPU + ASR → Whisper tiny CPU'da çalışır."],
+};
+
+function filter() {
+  const v = document.getElementById('f-veri').value;
+  const g = document.getElementById('f-gorev').value;
+  const k = document.getElementById('f-kisit').value;
+  const rows = document.querySelectorAll('#matrix tbody tr:not(.section-row)');
+
+  rows.forEach(row => {
+    row.classList.remove('highlighted','dimmed');
+    if (!v && !g && !k) return;
+    const rv = row.dataset.veri  || '';
+    const rg = row.dataset.gorev || '';
+    const rk = row.dataset.kisit || '';
+    const vM = !v || rv.includes(v);
+    const gM = !g || rg.includes(g);
+    const kM = !k || rk.includes(k);
+    row.classList.add(vM && gM && kM ? 'highlighted' : 'dimmed');
+  });
+
+  const recBox = document.getElementById('rec-box');
+  if (v && g && k) {
+    // Görev dropdown değeri "goruntu-sinif" gibi gelebilir, veri "goruntu"
+    // Anahtar formatı: "veri-gorev-kisit"
+    const key = v + '-' + g + '-' + k;
+    const rec = R[key];
+    if (rec) {
+      document.getElementById('rec-algo').textContent = rec[0];
+      document.getElementById('rec-why').textContent  = rec[1];
+      const el = document.getElementById('rec-algo');
+      if (rec[0].includes('⚠'))                                             el.style.color = 'var(--danger)';
+      else if (/LightGBM|XGBoost|Forest|Boost|Extra Trees/.test(rec[0]))   el.style.color = 'var(--ensemble)';
+      else if (/BERT|LLaMA|ViT|GCN|LSTM|TFT|wav2vec|YOLO|Diffusion|SAM|Whisper|DeBERTa|VITS|PatchTST|N-BEATS|TCN/.test(rec[0])) el.style.color = 'var(--dl)';
+      else                                                                   el.style.color = 'var(--klasik)';
+      recBox.classList.add('visible');
+    } else {
+      recBox.classList.remove('visible');
+    }
+  } else {
+    recBox.classList.remove('visible');
+  }
+}
+</script>
+</body>
+</html>
